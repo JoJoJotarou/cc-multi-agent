@@ -101,6 +101,8 @@ curl -fsSL https://raw.githubusercontent.com/JoJoJotarou/cc-multi-agent/master/i
   bash -s --
 ```
 
+对 Claude Code，远程安装会把 marketplace 声明成 GitHub source。
+
 本地仓库：
 
 ```bash
@@ -134,7 +136,7 @@ curl -fsSL https://raw.githubusercontent.com/JoJoJotarou/cc-multi-agent/master/i
 - `--target` 支持 `claude`、`codex`、`all`
 - `--scope` 支持 `user`、`project`、`local`，其中 `local` 只用于 Claude
 - `--project-dir` 用于在目标项目目录外执行安装
-- `--activate-coordinator yes` 会把 `coordinator` 写成 Claude 默认 agent
+- `--activate-coordinator yes` 会写入目标 Claude 的 `agent` 配置
 - `--dry-run` 只预览，不写文件
 
 ## 安装器实际会做什么
@@ -143,12 +145,13 @@ curl -fsSL https://raw.githubusercontent.com/JoJoJotarou/cc-multi-agent/master/i
 
 Claude 安装会：
 
-- 准备一个持久化的本地 plugin source cache
-- 调用本地 `claude plugin validate`
-- 调用本地 `claude plugin marketplace add/update`
+- 本地仓库安装会准备一个持久化的 directory source cache
+- 远程安装会把 marketplace 声明成 `github:JoJoJotarou/cc-multi-agent`
+- 本地 directory 安装会调用 `claude plugin validate`
+- 所有 Claude 安装都会调用 `claude plugin marketplace add/update`
 - 调用本地 `claude plugin install --scope ...`
 
-使用 `--activate-coordinator yes` 时，安装器还会写入这份 Claude plugin `settings.json`：
+使用 `--activate-coordinator yes` 时，安装器还会写入目标 Claude settings 中的这项配置：
 
 ```json
 {

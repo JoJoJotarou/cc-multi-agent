@@ -108,6 +108,8 @@ curl -fsSL https://raw.githubusercontent.com/JoJoJotarou/cc-multi-agent/master/i
 
 Remote installs use `JoJoJotarou/cc-multi-agent` on `master`.
 
+For Claude Code, remote installs declare the marketplace as a GitHub source.
+
 The guided installer covers target, scope, project directory, and Claude coordinator activation.
 
 Local checkout:
@@ -143,7 +145,7 @@ Change parameters as needed:
 - `--target` supports `claude`, `codex`, and `all`
 - `--scope` supports `user`, `project`, and `local` (`local` is Claude-only)
 - `--project-dir` selects the target project when you are outside that directory
-- `--activate-coordinator yes` writes Claude plugin settings with `coordinator` as default
+- `--activate-coordinator yes` writes the target Claude `agent` setting
 - `--dry-run` previews the install without writing files
 
 ## What the Installer Actually Does
@@ -152,12 +154,13 @@ Change parameters as needed:
 
 Claude installation:
 
-- prepares a persistent local plugin source cache
-- calls the local `claude plugin validate` command
-- calls the local `claude plugin marketplace add/update` command
+- local-checkout installs prepare a persistent directory source cache
+- remote installs declare the marketplace as `github:JoJoJotarou/cc-multi-agent`
+- local directory installs call `claude plugin validate`
+- all Claude installs call `claude plugin marketplace add/update`
 - calls the local `claude plugin install --scope ...` command
 
-With `--activate-coordinator yes`, the installer also writes this Claude plugin `settings.json`:
+With `--activate-coordinator yes`, the installer also writes this target Claude settings entry:
 
 ```json
 {

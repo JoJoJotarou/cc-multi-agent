@@ -24,6 +24,8 @@ HAD_ARGS="no"
 
 WORK_DIR=""
 DOWNLOAD_DIR=""
+DISCOVERED_SOURCE_KIND=""
+DISCOVERED_SOURCE_ROOT=""
 
 log() {
   printf '%s\n' "$*"
@@ -143,15 +145,22 @@ discover_source_root() {
   local root=""
 
   if root="$(detect_script_root)"; then
-    :
-  else
-    root="$(download_github_repo)"
+    DISCOVERED_SOURCE_KIND="local"
+    DISCOVERED_SOURCE_ROOT="${root}"
+    return 0
   fi
 
+  DISCOVERED_SOURCE_KIND="github"
+
+  if [[ "${TARGET}" == "claude" ]]; then
+    DISCOVERED_SOURCE_ROOT=""
+    return 0
+  fi
+
+  root="$(download_github_repo)"
   [[ -d "${root}/agents" ]] || die "Source root does not contain agents/: ${root}"
   [[ -d "${root}/.claude-plugin" ]] || die "Source root does not contain .claude-plugin/: ${root}"
-
-  printf '%s\n' "${root}"
+  DISCOVERED_SOURCE_ROOT="${root}"
 }
 
 ensure_project_dir() {
@@ -341,23 +350,12 @@ copy_source_artifacts() {
 prepare_claude_plugin_source() {
   local source_root="$1"
   local plugin_source_dir
-  local default_agent_ref="${DEFAULT_PLUGIN_NAME}:coordinator"
 
   plugin_source_dir="$(cache_root)/claude-plugin-source"
 
   if [[ "${DRY_RUN}" != "yes" ]]; then
     mkdir -p "$(dirname "${plugin_source_dir}")"
     copy_source_artifacts "${source_root}" "${plugin_source_dir}"
-
-    if [[ "${ACTIVATE_COORDINATOR}" == "yes" ]]; then
-      cat > "${plugin_source_dir}/.claude-plugin/settings.json" <<EOF
-{
-  "agent": "${default_agent_ref}"
-}
-EOF
-    else
-      rm -f "${plugin_source_dir}/.claude-plugin/settings.json"
-    fi
   fi
 
   printf '%s\n' "${plugin_source_dir}"
@@ -370,18 +368,99 @@ run_claude_cli() {
   )
 }
 
-claude_marketplace_install_location() {
-  local marketplace_name="$1"
-  run_claude_cli plugin marketplace list --json | jq -r --arg name "${marketplace_name}" '
-    first(.[] | select(.name == $name) | (.installLocation // .path // empty))
-  '
+claude_settings_file() {
+  case "${SCOPE}" in
+    user)
+      printf '%s\n' "${HOME}/.claude/settings.json"
+      ;;
+    project)
+      printf '%s\n' "${WORK_DIR}/.claude/settings.json"
+      ;;
+    local)
+      printf '%s\n' "${WORK_DIR}/.claude/settings.local.json"
+      ;;
+    *)
+      die "Unsupported Claude settings scope: ${SCOPE}"
+      ;;
+  esac
 }
 
-claude_plugin_marketplace_present() {
-  local marketplace_name="$1"
-  run_claude_cli plugin marketplace list --json | jq -e --arg name "${marketplace_name}" '
-    any(.[]; .name == $name)
-  ' >/dev/null
+write_claude_marketplace_setting() {
+  local settings_file="$1"
+  local source_kind="$2"
+  local source_value="$3"
+  local existing=""
+  local rendered=""
+
+  if [[ -f "${settings_file}" ]]; then
+    existing="$(cat "${settings_file}")"
+  fi
+
+  rendered="$(node - "${existing}" "${settings_file}" "${DEFAULT_MARKETPLACE_NAME}" "${source_kind}" "${source_value}" <<'NODE'
+const [, , existing, settingsFile, marketplaceName, sourceKind, sourceValue] = process.argv;
+let data = {};
+if (existing && existing.trim().length > 0) {
+  try {
+    data = JSON.parse(existing);
+  } catch (error) {
+    throw new Error(`Failed to parse ${settingsFile}: ${error.message}`);
+  }
+}
+if (!data.extraKnownMarketplaces || typeof data.extraKnownMarketplaces !== 'object' || Array.isArray(data.extraKnownMarketplaces)) {
+  data.extraKnownMarketplaces = {};
+}
+const source = { source: sourceKind };
+if (sourceKind === 'github') {
+  source.repo = sourceValue;
+} else {
+  source.path = sourceValue;
+}
+data.extraKnownMarketplaces[marketplaceName] = { source };
+process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
+NODE
+)"
+
+  if [[ "${DRY_RUN}" == "yes" ]]; then
+    log "  - would declare marketplace ${DEFAULT_MARKETPLACE_NAME} in ${settings_file} as ${source_kind}:${source_value}"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${settings_file}")"
+  printf '%s' "${rendered}" > "${settings_file}"
+}
+
+write_claude_default_agent_setting() {
+  local settings_file="$1"
+  local agent_ref="$2"
+  local existing=""
+  local rendered=""
+
+  if [[ -f "${settings_file}" ]]; then
+    existing="$(cat "${settings_file}")"
+  fi
+
+  rendered="$(node - "${existing}" "${agent_ref}" "${settings_file}" <<'NODE'
+const [, , existing, agentRef, settingsFile] = process.argv;
+let data = {};
+if (existing && existing.trim().length > 0) {
+  try {
+    data = JSON.parse(existing);
+  } catch (error) {
+    throw new Error(`Failed to parse ${settingsFile}: ${error.message}`);
+  }
+}
+data.agent = agentRef;
+process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
+NODE
+)"
+
+  if [[ "${DRY_RUN}" == "yes" ]]; then
+    log "  - would set default Claude agent in ${settings_file} to ${agent_ref}"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${settings_file}")"
+  printf '%s' "${rendered}" > "${settings_file}"
 }
 
 claude_plugin_installed() {
@@ -400,49 +479,63 @@ claude_plugin_installed() {
 
 install_claude_plugin() {
   local source_root="$1"
-  local plugin_source_dir
+  local plugin_source_dir=""
   local plugin_ref="${DEFAULT_PLUGIN_NAME}@${DEFAULT_MARKETPLACE_NAME}"
-  local existing_marketplace_location=""
+  local desired_marketplace_source=""
+  local desired_marketplace_source_kind=""
+  local default_agent_ref="${DEFAULT_PLUGIN_NAME}:coordinator"
+  local settings_file=""
 
   require_cmd claude
   require_cmd jq
+  settings_file="$(claude_settings_file)"
 
-  plugin_source_dir="$(prepare_claude_plugin_source "${source_root}")"
-  log "Preparing Claude Code plugin source at ${plugin_source_dir}"
+  if [[ "${DISCOVERED_SOURCE_KIND}" == "github" ]]; then
+    desired_marketplace_source_kind="github"
+    desired_marketplace_source="${DEFAULT_REMOTE_REPO}"
+    log "Preparing Claude Code marketplace source from GitHub repo ${desired_marketplace_source}"
+  else
+    desired_marketplace_source_kind="directory"
+    plugin_source_dir="$(prepare_claude_plugin_source "${source_root}")"
+    desired_marketplace_source="${plugin_source_dir}"
+    log "Preparing Claude Code plugin source at ${plugin_source_dir}"
+  fi
 
   if [[ "${DRY_RUN}" == "yes" ]]; then
-    log "  - would run: claude plugin validate ${plugin_source_dir}"
-    log "  - would ensure marketplace ${DEFAULT_MARKETPLACE_NAME} points to ${plugin_source_dir}"
+    if [[ "${desired_marketplace_source_kind}" == "directory" ]]; then
+      log "  - would run: claude plugin validate ${plugin_source_dir}"
+    fi
+    write_claude_marketplace_setting "${settings_file}" "${desired_marketplace_source_kind}" "${desired_marketplace_source}"
     log "  - would install ${plugin_ref} with scope ${SCOPE}"
+    if [[ "${ACTIVATE_COORDINATOR}" == "yes" ]]; then
+      write_claude_default_agent_setting "${settings_file}" "${default_agent_ref}"
+    fi
     return 0
   fi
 
-  run_claude_cli plugin validate "${plugin_source_dir}" >/dev/null
-
-  if claude_plugin_marketplace_present "${DEFAULT_MARKETPLACE_NAME}"; then
-    existing_marketplace_location="$(claude_marketplace_install_location "${DEFAULT_MARKETPLACE_NAME}")"
-    if [[ -n "${existing_marketplace_location}" && "${existing_marketplace_location}" != "${plugin_source_dir}" ]]; then
-      if [[ "${FORCE}" != "yes" ]]; then
-        die "Marketplace ${DEFAULT_MARKETPLACE_NAME} already exists at ${existing_marketplace_location}. Re-run with --force to replace it with ${plugin_source_dir}."
-      fi
-      run_claude_cli plugin marketplace remove "${DEFAULT_MARKETPLACE_NAME}" >/dev/null
-      run_claude_cli plugin marketplace add --scope "${SCOPE}" "${plugin_source_dir}" >/dev/null
-    else
-      run_claude_cli plugin marketplace update "${DEFAULT_MARKETPLACE_NAME}" >/dev/null
-    fi
-  else
-    run_claude_cli plugin marketplace add --scope "${SCOPE}" "${plugin_source_dir}" >/dev/null
+  if [[ "${desired_marketplace_source_kind}" == "directory" ]]; then
+    run_claude_cli plugin validate "${plugin_source_dir}" >/dev/null
   fi
+
+  run_claude_cli plugin marketplace add --scope "${SCOPE}" "${desired_marketplace_source}" >/dev/null
+  run_claude_cli plugin marketplace update "${DEFAULT_MARKETPLACE_NAME}" >/dev/null
+  write_claude_marketplace_setting "${settings_file}" "${desired_marketplace_source_kind}" "${desired_marketplace_source}"
 
   if claude_plugin_installed "${plugin_ref}" "${SCOPE}" "${WORK_DIR}"; then
     if [[ "${FORCE}" != "yes" ]]; then
       warn "Claude plugin ${plugin_ref} is already installed for scope ${SCOPE}. Re-run with --force to reinstall it."
-      return 0
+    else
+      run_claude_cli plugin uninstall --scope "${SCOPE}" "${plugin_ref}" >/dev/null || true
+      run_claude_cli plugin install --scope "${SCOPE}" "${plugin_ref}" >/dev/null
     fi
-    run_claude_cli plugin uninstall --scope "${SCOPE}" "${plugin_ref}" >/dev/null || true
+  else
+    run_claude_cli plugin install --scope "${SCOPE}" "${plugin_ref}" >/dev/null
   fi
 
-  run_claude_cli plugin install --scope "${SCOPE}" "${plugin_ref}" >/dev/null
+  if [[ "${ACTIVATE_COORDINATOR}" == "yes" ]]; then
+    settings_file="$(claude_settings_file)"
+    write_claude_default_agent_setting "${settings_file}" "${default_agent_ref}"
+  fi
 }
 
 print_summary() {
@@ -452,6 +545,12 @@ print_summary() {
   log "  target: ${TARGET}"
   log "  scope: ${SCOPE}"
   log "  activate coordinator: ${ACTIVATE_COORDINATOR}"
+  if [[ -n "${DISCOVERED_SOURCE_KIND}" ]]; then
+    log "  source kind: ${DISCOVERED_SOURCE_KIND}"
+    if [[ "${DISCOVERED_SOURCE_KIND}" == "github" ]]; then
+      log "  source repo: ${DEFAULT_REMOTE_REPO}@${DEFAULT_REMOTE_REF}"
+    fi
+  fi
   if [[ -n "${TARGET_PROJECT_DIR}" ]]; then
     log "  project dir: ${TARGET_PROJECT_DIR}"
   fi
@@ -575,7 +674,8 @@ main() {
   local codex_agent_dir=""
   local codex_agents_md=""
 
-  source_root="$(discover_source_root)"
+  discover_source_root
+  source_root="${DISCOVERED_SOURCE_ROOT}"
   project_dir="$(ensure_project_dir)"
   WORK_DIR="${project_dir}"
 
