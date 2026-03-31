@@ -19,6 +19,7 @@ English version: [README.md](./README.md)
 - `implementer` 负责实际实现
 - `code-simplifier` 负责在不改行为的前提下清理最近改动
 - `reviewer` 负责独立、偏风险导向的复查
+- `frontend-reviewer` 负责评估实际页面的风格一致性、视觉质量、可访问性、响应式和性能
 - `researcher` 只在缺少上下文、证据或最新资料时介入
 - `architect` 只在设计确实复杂时介入
 - `coordinator` 负责决定该走哪条路径，并对最终结果负责
@@ -40,6 +41,7 @@ coordinator
 - [`agents/implementer.md`](./agents/implementer.md)：主执行 agent
 - [`agents/code-simplifier.md`](./agents/code-simplifier.md)：轻量清理 agent
 - [`agents/reviewer.md`](./agents/reviewer.md)：风险导向 reviewer
+- [`agents/frontend-reviewer.md`](./agents/frontend-reviewer.md)：实际渲染页面与前端体验 reviewer
 - [`agents/researcher.md`](./agents/researcher.md)：上下文与证据收集
 - [`agents/architect.md`](./agents/architect.md)：仅负责设计判断
 
@@ -182,6 +184,13 @@ implementer -> code-simplifier -> reviewer
 - Bug 根因还不明确
 - 需要依赖最新外部信息
 
+在这些情况下加上 `frontend-reviewer`：
+
+- 改动影响了可见 UI 或页面交互
+- 需要判断页面到底够不够好看、够不够完整、能不能上线
+- 需要根据运行中的页面检查可访问性、响应式或性能
+- 需要把 `style.md`、设计 token 或既有页面风格落实到实际渲染结果
+
 在这些情况下加上 `architect`：
 
 - 改动跨模块或跨服务
@@ -202,6 +211,7 @@ implementer -> code-simplifier -> reviewer
 │   ├── architect.md
 │   ├── code-simplifier.md
 │   ├── coordinator.md
+│   ├── frontend-reviewer.md
 │   ├── implementer.md
 │   ├── researcher.md
 │   └── reviewer.md
@@ -214,6 +224,7 @@ implementer -> code-simplifier -> reviewer
 
 - `agents/` 是可安装角色的唯一真源。
 - Claude 侧只支持 plugin 路线。
+- `frontend-reviewer` 需要宿主会话里已经有浏览器工具。对 Claude plugin 安装来说，Chrome/Playwright MCP 需要在插件外部预先配置，因为 plugin subagent 不会自带 `mcpServers`。
 - Codex 项目级安装会更新目标项目的 `AGENTS.md`。
 - Codex 用户级安装会更新 `~/.codex/AGENTS.md`。
 

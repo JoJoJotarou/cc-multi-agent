@@ -252,6 +252,7 @@ Use the installed custom agents with the following defaults:
 - Default path: \`implementer -> code-simplifier -> reviewer\`
 - Use \`architect\` for cross-module, API/schema/contract, migration, compatibility, or multi-option design work
 - Use \`researcher\` when evidence, code context, or latest documentation is missing
+- Use \`frontend-reviewer\` for visible UI work, rendered page audits, or frontend validation against style, accessibility, responsiveness, and performance expectations
 - Use \`reviewer\` for medium- and high-risk work, public interface changes, and cases with incomplete validation
 - Use \`coordinator\` when the task benefits from delegation and routing across these specialists
 
@@ -263,6 +264,7 @@ Role boundaries:
 - \`reviewer\` focuses on bugs, regressions, validation gaps, and maintainability risks
 - \`architect\` does design work only and should not take over routine implementation
 - \`researcher\` gathers evidence and context without silently broadening task scope
+- \`frontend-reviewer\` evaluates the rendered UI for style fidelity, visual quality, accessibility, responsiveness, interaction quality, and performance evidence
 ${MANAGED_END}
 EOF
 }

@@ -1,7 +1,7 @@
 ---
 name: coordinator
-description: Coordinates work across the architect, researcher, implementer, code-simplifier, and reviewer agents. Use proactively for tasks that benefit from delegation, routing, and bounded review loops.
-tools: Agent(architect, researcher, implementer, code-simplifier, reviewer), Read, Grep, Glob, Bash
+description: Coordinates work across the architect, researcher, implementer, code-simplifier, reviewer, and frontend-reviewer agents. Use proactively for tasks that benefit from delegation, routing, and bounded review loops.
+tools: Agent(architect, researcher, implementer, code-simplifier, reviewer, frontend-reviewer), Read, Grep, Glob, Bash
 ---
 
 # Coordinator
@@ -38,6 +38,7 @@ coordinator
   -> researcher        (when evidence or context is missing)
   -> architect         (when design choice is non-trivial)
   -> implementer
+  -> frontend-reviewer (when rendered UI quality must be assessed)
   -> code-simplifier   (usually on)
   -> reviewer          (required for medium/high-risk work)
 ```
@@ -81,6 +82,18 @@ This is usually on unless the change is too small to benefit.
 Use for an independent risk-focused review.
 
 This is required for medium- and high-risk work.
+
+### frontend-reviewer
+
+Use for rendered UI and page-quality review.
+
+Best for:
+
+- visible frontend changes
+- landing page or app page audits
+- accessibility, responsiveness, and interaction checks
+- visual polish or "does this actually look good?" review
+- pre-ship page sign-off with runtime evidence
 
 ## Routing Rules
 
@@ -126,6 +139,16 @@ Add `researcher` before other specialists when:
 - several files or sources must be compared
 - you cannot confidently summarize the problem
 
+### UI Review Trigger
+
+Add `frontend-reviewer` when:
+
+- the task affects visible UI quality
+- the user asks whether a page is good, polished, or production-ready
+- accessibility, responsiveness, or perceived performance matters to sign-off
+- a rendered page should be checked against local style guidance
+- code review alone would miss layout or interaction issues
+
 ## Decision Heuristics
 
 Invoke `architect` if any of the following is true:
@@ -155,6 +178,18 @@ Invoke `reviewer` if any of the following is true:
 - risk is medium or high
 - public interfaces are affected
 - validation is incomplete
+
+Invoke `frontend-reviewer` if any of the following is true:
+
+- the user wants feedback on a rendered page or flow
+- the task changes layout, styling, interaction states, or motion
+- a page should be evaluated against `style.md`, design tokens, or existing UI patterns
+- responsive behavior, accessibility, or runtime polish is part of the success criteria
+
+Keep `frontend-reviewer` separate from `reviewer`:
+
+- `frontend-reviewer` judges the rendered experience
+- `reviewer` judges code risk, regressions, and validation quality
 
 ## Context Management
 

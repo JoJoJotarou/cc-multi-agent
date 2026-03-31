@@ -19,6 +19,7 @@ This pack sits between underpowered single-agent setups and over-orchestrated ag
 - `implementer` ships the change
 - `code-simplifier` cleans up touched code without changing behavior
 - `reviewer` does an independent risk-focused pass
+- `frontend-reviewer` evaluates rendered page quality, style fidelity, accessibility, responsiveness, and performance
 - `researcher` is added when context or evidence is missing
 - `architect` is added only when design choices are genuinely non-trivial
 - `coordinator` selects the path and owns the final outcome
@@ -40,6 +41,7 @@ coordinator
 - [`agents/implementer.md`](./agents/implementer.md): main execution agent
 - [`agents/code-simplifier.md`](./agents/code-simplifier.md): lightweight cleanup pass
 - [`agents/reviewer.md`](./agents/reviewer.md): independent risk-focused reviewer
+- [`agents/frontend-reviewer.md`](./agents/frontend-reviewer.md): rendered UI and frontend page-quality reviewer
 - [`agents/researcher.md`](./agents/researcher.md): evidence and context gathering
 - [`agents/architect.md`](./agents/architect.md): design-only agent for non-trivial decisions
 
@@ -191,6 +193,13 @@ Add `researcher` when:
 - the bug is not yet understood
 - up-to-date external information matters
 
+Add `frontend-reviewer` when:
+
+- the task changes visible UI or page behavior
+- you need evidence-based feedback on whether a page looks good enough to ship
+- accessibility, responsiveness, or performance should be checked on the rendered page
+- local style guidance or design tokens should be enforced against runtime output
+
 Add `architect` when:
 
 - the change spans modules or services
@@ -211,6 +220,7 @@ Use `coordinator` as the entrypoint when you want routing handled explicitly.
 │   ├── architect.md
 │   ├── code-simplifier.md
 │   ├── coordinator.md
+│   ├── frontend-reviewer.md
 │   ├── implementer.md
 │   ├── researcher.md
 │   └── reviewer.md
@@ -223,6 +233,7 @@ Use `coordinator` as the entrypoint when you want routing handled explicitly.
 
 - `agents/` is the canonical source for installable roles.
 - Claude support is plugin-based only.
+- `frontend-reviewer` expects browser tooling to exist in the host session. For Claude plugin installs, configure Chrome/Playwright MCP outside the plugin because plugin subagents do not ship `mcpServers`.
 - Codex project installs update the target project's `AGENTS.md`.
 - Codex user installs update `~/.codex/AGENTS.md`.
 - If a platform capability is not clearly documented, this repo prefers not to fake support for it.
