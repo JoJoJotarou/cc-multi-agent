@@ -66,6 +66,7 @@ Options:
 
 Notes:
   - Running the script without arguments starts the interactive installer when a terminal is available.
+  - Interactive mode uses numbered choices for target, scope, and coordinator activation.
   - Claude Code plugin installs support user, project, and local scopes.
   - Codex subagent installs currently support user and project scopes only.
   - Remote installs use the built-in GitHub source defined in this script.
@@ -621,17 +622,104 @@ read_with_default() {
   fi
 }
 
+option_index_for_value() {
+  local target_value="$1"
+  shift
+
+  local index=1
+  local option=""
+  for option in "$@"; do
+    if [[ "${option}" == "${target_value}" ]]; then
+      printf '%s\n' "${index}"
+      return 0
+    fi
+    index=$((index + 1))
+  done
+
+  return 1
+}
+
+choose_from_options() {
+  local prompt="$1"
+  local default_value="$2"
+  shift 2
+
+  local options=("$@")
+  local default_index=""
+  local choice=""
+  local option=""
+  local index=1
+
+  if ! default_index="$(option_index_for_value "${default_value}" "${options[@]}")"; then
+    default_value="${options[0]}"
+    default_index="1"
+  fi
+
+  while true; do
+    printf '%s\n' "${prompt}" >&2
+    index=1
+    for option in "${options[@]}"; do
+      if [[ "${option}" == "${default_value}" ]]; then
+        printf '  %s) %s (default)\n' "${index}" "${option}" >&2
+      else
+        printf '  %s) %s\n' "${index}" "${option}" >&2
+      fi
+      index=$((index + 1))
+    done
+
+    choice="$(read_with_default "Choose" "${default_index}")"
+    if [[ "${choice}" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
+      printf '%s\n' "${options[$((choice - 1))]}"
+      return 0
+    fi
+
+    warn "Please enter a number between 1 and ${#options[@]}."
+    printf '\n' >&2
+  done
+}
+
+normalize_scope_for_target() {
+  local target="$1"
+  local current_scope="$2"
+
+  case "${target}" in
+    claude)
+      case "${current_scope}" in
+        user|project|local) printf '%s\n' "${current_scope}" ;;
+        *) printf '%s\n' "project" ;;
+      esac
+      ;;
+    codex|all)
+      case "${current_scope}" in
+        user|project) printf '%s\n' "${current_scope}" ;;
+        *) printf '%s\n' "project" ;;
+      esac
+      ;;
+    *)
+      printf '%s\n' "project"
+      ;;
+  esac
+}
+
 prompt_interactively() {
   [[ -t 0 ]] || tty_input_available || return 0
 
   log ""
   log "Interactive install guide"
 
-  TARGET="$(read_with_default "Target (claude/codex/all)" "${TARGET}")"
-  SCOPE="$(read_with_default "Scope (user/project/local)" "${SCOPE}")"
+  local scope_default=""
+
+  TARGET="$(choose_from_options "Select installation target:" "${TARGET}" "claude" "codex" "all")"
+
+  scope_default="$(normalize_scope_for_target "${TARGET}" "${SCOPE}")"
+  if [[ "${TARGET}" == "claude" ]]; then
+    SCOPE="$(choose_from_options "Select installation scope:" "${scope_default}" "user" "project" "local")"
+  else
+    SCOPE="$(choose_from_options "Select installation scope:" "${scope_default}" "user" "project")"
+  fi
 
   if [[ "${TARGET}" == "claude" || "${TARGET}" == "all" ]]; then
-    ACTIVATE_COORDINATOR="$(read_with_default "Activate coordinator by default for Claude? (yes/no)" "${ACTIVATE_COORDINATOR}")"
+    ACTIVATE_COORDINATOR="$(choose_from_options "Activate coordinator as the default Claude agent?" "${ACTIVATE_COORDINATOR}" "yes" "no")"
   fi
 
   if [[ "${SCOPE}" != "user" ]]; then

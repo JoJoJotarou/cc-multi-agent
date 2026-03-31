@@ -112,7 +112,7 @@ Remote installs use `JoJoJotarou/cc-multi-agent` on `master`.
 
 For Claude Code, remote installs declare the marketplace as a GitHub source.
 
-The guided installer covers target, scope, project directory, and Claude coordinator activation.
+The guided installer uses numbered choices for target, scope, and coordinator activation, then keeps `project directory` as a text input.
 
 Local checkout:
 

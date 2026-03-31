@@ -105,6 +105,8 @@ curl -fsSL https://raw.githubusercontent.com/JoJoJotarou/cc-multi-agent/master/i
 
 对 Claude Code，远程安装会把 marketplace 声明成 GitHub source。
 
+交互式安装会用编号选择 target、scope 和 coordinator 激活状态，`project directory` 继续保留文本输入。
+
 本地仓库：
 
 ```bash
