@@ -1,0 +1,16 @@
+{
+  "name": "jojojotarou-cc-multi-agent-marketplace",
+  "metadata": {
+    "description": "A marketplace that distributes a practical multi-agent pack for Claude Code and companion Codex installs."
+  },
+  "owner": {
+    "name": "Changjunjie"
+  },
+  "plugins": [
+    {
+      "name": "jojojotarou-cc-multi-agent",
+      "source": "./",
+      "description": "A practical multi-agent pack for implementation, simplification, review, research, and architecture work."
+    }
+  ]
+}
