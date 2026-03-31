@@ -79,8 +79,8 @@ Claude standalone agents are out of scope for this repo.
 
 `Codex` support is generated from `agents/`:
 
-- writing subagent files into `.codex/agents/`
-- updating the target `AGENTS.md` with a managed routing block during installation
+- writing subagent files into `.codex/agents/` for every agent except `coordinator`
+- updating the target `AGENTS.md` with managed `coordinator.md` instructions during installation
 
 Supported scopes:
 
@@ -174,10 +174,10 @@ With `--activate-coordinator yes`, the installer also writes this target Claude 
 
 Codex installation:
 
-- converts each Markdown agent in `agents/` into a Codex `.toml` subagent
+- converts each Markdown agent in `agents/` except `coordinator` into a Codex `.toml` subagent
 - writes them into either `~/.codex/agents/` or `<project>/.codex/agents/`
-- updates either `~/.codex/AGENTS.md` or `<project>/AGENTS.md`
-- injects a managed routing policy block without overwriting unrelated content
+- updates either `~/.codex/AGENTS.md` or `<project>/AGENTS.md` from `agents/coordinator.md`
+- injects only the managed coordinator block without overwriting unrelated content
 
 ## Suggested Workflow
 

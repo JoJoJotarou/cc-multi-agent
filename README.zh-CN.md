@@ -76,8 +76,8 @@ coordinator
 
 `Codex` 安装由 `agents/` 生成：
 
-- 把 `agents/` 下的 Markdown agent 转成 `.codex/agents/*.toml`
-- 在安装时把受管路由规则写入目标 `AGENTS.md`
+- 把 `agents/` 下除 `coordinator` 外的 Markdown agent 转成 `.codex/agents/*.toml`
+- 在安装时把 `coordinator.md` 的受管内容写入目标 `AGENTS.md`
 
 支持的 scope：
 
@@ -167,10 +167,10 @@ Claude 安装会：
 
 Codex 安装会：
 
-- 把 `agents/` 下的每个 Markdown agent 转成 Codex `.toml`
+- 把 `agents/` 下除 `coordinator` 外的每个 Markdown agent 转成 Codex `.toml`
 - 写入 `~/.codex/agents/` 或 `<project>/.codex/agents/`
-- 更新 `~/.codex/AGENTS.md` 或 `<project>/AGENTS.md`
-- 只写入受管块，不覆盖无关内容
+- 用 `agents/coordinator.md` 更新 `~/.codex/AGENTS.md` 或 `<project>/AGENTS.md`
+- 只写入受管的 coordinator 块，不覆盖无关内容
 
 ## 推荐使用方式
 

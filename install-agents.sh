@@ -244,37 +244,28 @@ list_agent_files() {
 }
 
 managed_codex_block() {
-  cat <<EOF
-${MANAGED_BEGIN}
-## Installed Subagent Routing Policy
+  local source_root="$1"
+  local coordinator_file="${source_root}/agents/coordinator.md"
+  local json
 
-Use the installed custom agents with the following defaults:
+  [[ -f "${coordinator_file}" ]] || die "Missing coordinator agent file: ${coordinator_file}"
+  json="$(yaml_frontmatter_to_json "${coordinator_file}")"
 
-- Default path: \`implementer -> code-simplifier -> reviewer\`
-- Use \`architect\` for cross-module, API/schema/contract, migration, compatibility, or multi-option design work
-- Use \`researcher\` when evidence, code context, or latest documentation is missing
-- Use \`frontend-reviewer\` for visible UI work, rendered page audits, or frontend validation against style, accessibility, responsiveness, and performance expectations
-- Use \`reviewer\` for medium- and high-risk work, public interface changes, and cases with incomplete validation
-- Use \`coordinator\` when the task benefits from delegation and routing across these specialists
-
-Role boundaries:
-
-- \`coordinator\` decides routing and owns the final answer
-- \`implementer\` makes the actual code change
-- \`code-simplifier\` cleans up recently changed code without changing behavior
-- \`reviewer\` focuses on bugs, regressions, validation gaps, and maintainability risks
-- \`architect\` does design work only and should not take over routine implementation
-- \`researcher\` gathers evidence and context without silently broadening task scope
-- \`frontend-reviewer\` evaluates the rendered UI for style fidelity, visual quality, accessibility, responsiveness, interaction quality, and performance evidence
-${MANAGED_END}
-EOF
+  node - "${json}" "${MANAGED_BEGIN}" "${MANAGED_END}" <<'NODE'
+const agent = JSON.parse(process.argv[2]);
+const begin = process.argv[3];
+const end = process.argv[4];
+const body = (agent.body || '').trim();
+process.stdout.write(`${begin}\n${body}\n${end}`);
+NODE
 }
 
 write_managed_block() {
-  local target_file="$1"
+  local source_root="$1"
+  local target_file="$2"
   local existing=""
   local managed
-  managed="$(managed_codex_block)"
+  managed="$(managed_codex_block "${source_root}")"
 
   if [[ -f "${target_file}" ]]; then
     existing="$(cat "${target_file}")"
@@ -321,6 +312,12 @@ install_codex_agents() {
 
   while read -r agent_file; do
     basename="$(basename "${agent_file}" .md)"
+    if [[ "${basename}" == "coordinator" ]]; then
+      if [[ "${DRY_RUN}" == "yes" ]]; then
+        log "  - would skip ${codex_agent_dir}/${basename}.toml because coordinator instructions are managed via ${codex_agents_md}"
+      fi
+      continue
+    fi
     toml_content="$(generate_codex_toml "${agent_file}")"
     if [[ "${DRY_RUN}" == "yes" ]]; then
       log "  - would write ${codex_agent_dir}/${basename}.toml"
@@ -329,7 +326,7 @@ install_codex_agents() {
     fi
   done < <(list_agent_files "${source_root}")
 
-  write_managed_block "${codex_agents_md}"
+  write_managed_block "${source_root}" "${codex_agents_md}"
 }
 
 copy_source_artifacts() {
