@@ -95,9 +95,23 @@ cache_root() {
 }
 
 detect_script_root() {
+  local script_path=""
   local script_dir
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [[ -d "${script_dir}/agents" && -f "${script_dir}/AGENTS.md" ]]; then
+
+  if [[ ${#BASH_SOURCE[@]} -gt 0 ]]; then
+    script_path="${BASH_SOURCE[0]:-}"
+  fi
+
+  if [[ -z "${script_path}" || "${script_path}" == "-" || "${script_path}" == "bash" ]]; then
+    script_path="${0:-}"
+  fi
+
+  if [[ -z "${script_path}" || "${script_path}" == "-" || "${script_path}" == "bash" ]]; then
+    return 1
+  fi
+
+  script_dir="$(cd "$(dirname "${script_path}")" && pwd)"
+  if [[ -d "${script_dir}/agents" && -d "${script_dir}/.claude-plugin" ]]; then
     printf '%s\n' "${script_dir}"
     return 0
   fi
@@ -115,7 +129,7 @@ download_github_repo() {
   [[ -n "${DEFAULT_REMOTE_REPO}" ]] || die "DEFAULT_REMOTE_REPO is not configured in this script."
   [[ -n "${DEFAULT_REMOTE_REF}" ]] || die "DEFAULT_REMOTE_REF is not configured in this script."
 
-  log "Downloading ${DEFAULT_REMOTE_REPO}@${DEFAULT_REMOTE_REF}"
+  printf '%s\n' "Downloading ${DEFAULT_REMOTE_REPO}@${DEFAULT_REMOTE_REF}" >&2
   curl -fsSL "${url}" -o "${archive_path}"
   tar -xzf "${archive_path}" -C "${DOWNLOAD_DIR}"
 
@@ -135,7 +149,6 @@ discover_source_root() {
   fi
 
   [[ -d "${root}/agents" ]] || die "Source root does not contain agents/: ${root}"
-  [[ -f "${root}/AGENTS.md" ]] || die "Source root does not contain AGENTS.md: ${root}"
   [[ -d "${root}/.claude-plugin" ]] || die "Source root does not contain .claude-plugin/: ${root}"
 
   printf '%s\n' "${root}"
